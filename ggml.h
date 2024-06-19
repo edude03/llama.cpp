@@ -378,6 +378,7 @@ extern "C" {
         GGML_TYPE_IQ1_M   = 29,
         GGML_TYPE_BF16    = 30,
         GGML_TYPE_Q2_2    = 31,
+        GGML_TYPE_Q1_3    = 32,
         GGML_TYPE_COUNT,
     };
 
