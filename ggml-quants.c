@@ -669,21 +669,21 @@ void quantize_row_q2_2_reference(const float * restrict x, block_q2_2 * restrict
     for (int i = 0; i < nb; i++) {
 
         for (int j = 0; j < qk/4; ++j) {
-            int8_t x0 = (int8_t)x[i*qk + j*4 + 0];
-            int8_t x1 = (int8_t)x[i*qk + j*4 + 1];
-            int8_t x2 = (int8_t)x[i*qk + j*4 + 2];
-            int8_t x3 = (int8_t)x[i*qk + j*4 + 3];
+            int8_t x0 = (int8_t)x[i*qk + 0      + j];
+            int8_t x1 = (int8_t)x[i*qk + 1*qk/4 + j];
+            int8_t x2 = (int8_t)x[i*qk + 2*qk/4 + j];
+            int8_t x3 = (int8_t)x[i*qk + 3*qk/4 + j];
 
-            const uint8_t xi0 = x0 >= 0 ? x0 : 3;
-            const uint8_t xi1 = x1 >= 0 ? x1 : 3;
-            const uint8_t xi2 = x2 >= 0 ? x2 : 3;
-            const uint8_t xi3 = x3 >= 0 ? x3 : 3;
+            const uint8_t xi0 = x0 < 0 ? 1 : x0 == 0 ? 2 : 3;
+            const uint8_t xi1 = x1 < 0 ? 1 : x1 == 0 ? 2 : 3;
+            const uint8_t xi2 = x2 < 0 ? 1 : x2 == 0 ? 2 : 3;
+            const uint8_t xi3 = x3 < 0 ? 1 : x3 == 0 ? 2 : 3;
 
             y[i].qs[j] = 0;
-            y[i].qs[j] |= (xi0 << 6);
-            y[i].qs[j] |= (xi1 << 4);
-            y[i].qs[j] |= (xi2 << 2);
-            y[i].qs[j] |= (xi3 << 0);
+            y[i].qs[j] |= (xi0 << 0);
+            y[i].qs[j] |= (xi1 << 2);
+            y[i].qs[j] |= (xi2 << 4);
+            y[i].qs[j] |= (xi3 << 6);
         }
     }
 }
@@ -1555,12 +1555,12 @@ void dequantize_row_q2_2(const block_q2_2 * restrict x, float * restrict y, int6
     for (int i = 0; i < nb; i++) {
 
         for (int j = 0; j < qk/4; ++j) {
-            const int8_t * q = (const int8_t *) (q22_grid + x[i].qs[j]);
+            const int8_t q = x[i].qs[j];
 
-            *y++ = (float) q[0];
-            *y++ = (float) q[1];
-            *y++ = (float) q[2];
-            *y++ = (float) q[3];
+            y[i*qk + j + 0     ] = (float) (((q >> 0) & 3) - 2);
+            y[i*qk + j + 1*qk/4] = (float) (((q >> 2) & 3) - 2);
+            y[i*qk + j + 2*qk/4] = (float) (((q >> 4) & 3) - 2);
+            y[i*qk + j + 3*qk/4] = (float) (((q >> 6) & 3) - 2);
         }
     }
 }
@@ -3929,82 +3929,18 @@ void ggml_vec_dot_q2_2_q8_0(int n, float * restrict s, size_t bs, const void * r
 #if defined(__AVX2__)
     __m256 acc = _mm256_setzero_ps();
 
-    int leftovers = nb % 2;
-
-    for (int i = 0; i < nb - leftovers; i += 2) {
-
-        const __m256 d0 = _mm256_set1_ps( GGML_FP16_TO_FP32(y[i + 0].d) );
-        const __m256 d1 = _mm256_set1_ps( GGML_FP16_TO_FP32(y[i + 1].d) );
-
-        // assuming two consecutive blocks are contiguous AND aligned
-        __m128i xq16b = _mm_load_si128((const __m128i *) (x[i].qs));
-        __m256i xq16 = MM256_SET_M128I(xq16b, xq16b);
-        __m256i xq8l0 = _mm256_shuffle_epi8(xq16, _mm256_set_epi8(5, -1, 5, -1, 5, -1, 5, -1,
-                                                                  4, -1, 4, -1, 4, -1, 4, -1,
-                                                                  1, -1, 1, -1, 1, -1, 1, -1,
-                                                                  0, -1, 0, -1, 0, -1, 0, -1));
-        __m256i xq8h0 = _mm256_shuffle_epi8(xq16, _mm256_set_epi8(7, -1, 7, -1, 7, -1, 7, -1,
-                                                                  6, -1, 6, -1, 6, -1, 6, -1,
-                                                                  3, -1, 3, -1, 3, -1, 3, -1,
-                                                                  2, -1, 2, -1, 2, -1, 2, -1));
-        __m256i xq8l1 = _mm256_shuffle_epi8(xq16, _mm256_set_epi8(13, -1, 13, -1, 13, -1, 13, -1,
-                                                                  12, -1, 12, -1, 12, -1, 12, -1,
-                                                                   9, -1,  9, -1,  9, -1,  9, -1,
-                                                                   8, -1,  8, -1,  8, -1,  8, -1));
-        __m256i xq8h1 = _mm256_shuffle_epi8(xq16, _mm256_set_epi8(15, -1, 15, -1, 15, -1, 15, -1,
-                                                                  14, -1, 14, -1, 14, -1, 14, -1,
-                                                                  11, -1, 11, -1, 11, -1, 11, -1,
-                                                                  10, -1, 10, -1, 10, -1, 10, -1));
-        __m256i shift = _mm256_set_epi16(64, 16, 4, 1,
-                                         64, 16, 4, 1,
-                                         64, 16, 4, 1,
-                                         64, 16, 4, 1);
-        xq8l0 = _mm256_mullo_epi16(xq8l0, shift);
-        xq8h0 = _mm256_mullo_epi16(xq8h0, shift);
-        xq8l1 = _mm256_mullo_epi16(xq8l1, shift);
-        xq8h1 = _mm256_mullo_epi16(xq8h1, shift);
-        xq8l0 = _mm256_srai_epi16(xq8l0, 14);
-        xq8h0 = _mm256_srai_epi16(xq8h0, 14);
-        xq8l1 = _mm256_srai_epi16(xq8l1, 14);
-        xq8h1 = _mm256_srai_epi16(xq8h1, 14);
-        __m256i xq8_0 = _mm256_packs_epi16(xq8l0, xq8h0);
-        __m256i xq8_1 = _mm256_packs_epi16(xq8l1, xq8h1);
-
-        __m256i yq8_0 = _mm256_loadu_si256((const __m256i *) (y[i + 0].qs));
-        __m256i yq8_1 = _mm256_loadu_si256((const __m256i *) (y[i + 1].qs));
-
-        const __m256 q0 = mul_sum_i8_pairs_float(xq8_0, yq8_0);
-        const __m256 q1 = mul_sum_i8_pairs_float(xq8_1, yq8_1);
-
-        acc = _mm256_fmadd_ps( d0, q0, acc );
-        acc = _mm256_fmadd_ps( d1, q1, acc );
-    }
-
-    for (int i = nb - leftovers; i < nb; ++i) {
+    for (int i = 0; i < nb; ++i) {
 
         const __m256 d = _mm256_set1_ps( GGML_FP16_TO_FP32(y[i].d) );
 
-        __m128i xq8b = _mm_loadu_si64(x[i].qs);
-        __m256i xq8 = MM256_SET_M128I(xq8b, xq8b);
-        __m256i xq8l = _mm256_shuffle_epi8(xq8, _mm256_set_epi8(5, -1, 5, -1, 5, -1, 5, -1,
-                                                                4, -1, 4, -1, 4, -1, 4, -1,
-                                                                1, -1, 1, -1, 1, -1, 1, -1,
-                                                                0, -1, 0, -1, 0, -1, 0, -1));
-        __m256i xq8h = _mm256_shuffle_epi8(xq8, _mm256_set_epi8(7, -1, 7, -1, 7, -1, 7, -1,
-                                                                6, -1, 6, -1, 6, -1, 6, -1,
-                                                                3, -1, 3, -1, 3, -1, 3, -1,
-                                                                2, -1, 2, -1, 2, -1, 2, -1));
-        __m256i shift = _mm256_set_epi16(64, 16, 4, 1,
-                                         64, 16, 4, 1,
-                                         64, 16, 4, 1,
-                                         64, 16, 4, 1);
-        xq8l = _mm256_mullo_epi16(xq8l, shift);
-        xq8h = _mm256_mullo_epi16(xq8h, shift);
-        xq8l = _mm256_srai_epi16(xq8l, 14);
-        xq8h = _mm256_srai_epi16(xq8h, 14);
-        xq8 = _mm256_packs_epi16(xq8l, xq8h);
+        // assuming this is always aligned
+        __m256i xq8 = _mm256_set1_epi64x(*(const int64_t *) x[i].qs);
+        xq8 = _mm256_srlv_epi64(xq8, _mm256_set_epi64x(6, 4, 2, 0));
+        xq8 = _mm256_and_si256(xq8, _mm256_set1_epi8(0x03));
+        // stangely enough, this is much slower with 1 instead of 2
+        xq8 = _mm256_sub_epi8(xq8, _mm256_set1_epi8(2));
 
-        __m256i yq8 = _mm256_loadu_si256((const __m256i *) (y[i].qs));
+        const __m256i yq8 = _mm256_loadu_si256((const __m256i *) (y[i].qs));
         const __m256 q = mul_sum_i8_pairs_float(xq8, yq8);
 
         acc = _mm256_fmadd_ps( d, q, acc );
@@ -4017,11 +3953,11 @@ void ggml_vec_dot_q2_2_q8_0(int n, float * restrict s, size_t bs, const void * r
     for (int i = 0; i < nb; i++) {
         int sumi = 0;
         for (int j = 0; j < qk / 4; j++) {
-            const int8_t* weight = (const int8_t *)(q22_grid + x[i].qs[j]);
-            sumi += (int)y[i].qs[4*j+0] * weight[0];
-            sumi += (int)y[i].qs[4*j+1] * weight[1];
-            sumi += (int)y[i].qs[4*j+2] * weight[2];
-            sumi += (int)y[i].qs[4*j+3] * weight[3];
+            const uint8_t weight = x[i].qs[j];
+            sumi += (int)y[i].qs[j + 0*qk/4] * ((weight >> 0) & 3) - 2;
+            sumi += (int)y[i].qs[j + 1*qk/4] * ((weight >> 2) & 3) - 2;
+            sumi += (int)y[i].qs[j + 2*qk/4] * ((weight >> 4) & 3) - 2;
+            sumi += (int)y[i].qs[j + 3*qk/4] * ((weight >> 6) & 3) - 2;
         }
         sumf += (float)(sumi)*(GGML_FP16_TO_FP32(y[i].d));
     }
