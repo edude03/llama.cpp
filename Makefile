@@ -61,6 +61,85 @@ TEST_TARGETS = \
 	tests/test-tokenizer-1-bpe \
 	tests/test-tokenizer-1-spm
 
+# Deprecation aliases
+ifdef LLAMA_CUBLAS
+$(error LLAMA_CUBLAS is removed. Use GGML_CUDA instead.)
+endif
+
+ifdef LLAMA_CUDA
+GGML_CUDA := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_KOMPUTE
+GGML_KOMPUTE := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_METAL
+GGML_METAL := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_METAL_EMBED_LIBRARY
+GGML_METAL_EMBED_LIBRARY := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_OPENMP
+GGML_OPENMP := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_RPC
+GGML_RPC := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_SYCL
+GGML_SYCL := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_SYCL_F16
+GGML_SYCL_F16 := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_OPENBLAS
+GGML_OPENBLAS := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_OPENBLAS64
+GGML_OPENBLAS64 := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_BLIS
+GGML_BLIS := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_NO_LLAMAFILE
+GGML_NO_LLAMAFILE := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_NO_ACCELERATE
+GGML_NO_ACCELERATE := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_NO_OPENMP
+GGML_NO_OPENMP := 1
+DEPRECATE_WARNING := 1
+endif
+
+ifdef LLAMA_NO_METAL
+GGML_NO_METAL := 1
+DEPRECATE_WARNING := 1
+endif
 ifndef UNAME_S
 UNAME_S := $(shell uname -s)
 endif
@@ -87,11 +166,11 @@ endif
 # Mac OS + Arm can report x86_64
 # ref: https://github.com/ggerganov/whisper.cpp/issues/66#issuecomment-1282546789
 ifeq ($(UNAME_S),Darwin)
-	ifndef LLAMA_NO_METAL
-		LLAMA_METAL := 1
+	ifndef GGML_NO_METAL
+		GGML_METAL := 1
 	endif
 
-	LLAMA_NO_OPENMP := 1
+	GGML_NO_OPENMP := 1
 
 	ifneq ($(UNAME_P),arm)
 		SYSCTL_M := $(shell sysctl -n hw.optional.arm64 2>/dev/null)
@@ -103,7 +182,7 @@ ifeq ($(UNAME_S),Darwin)
 	endif
 endif
 
-ifdef LLAMA_RPC
+ifdef GGML_RPC
 	BUILD_TARGETS += rpc-server
 endif
 
@@ -159,21 +238,6 @@ MK_CFLAGS    = -std=c11   -fPIC
 MK_CXXFLAGS  = -std=c++11 -fPIC
 MK_NVCCFLAGS = -std=c++11
 
-# -Ofast tends to produce faster code, but may not be available for some compilers.
-ifdef LLAMA_FAST
-MK_CFLAGS     += -Ofast
-HOST_CXXFLAGS += -Ofast
-ifndef LLAMA_DEBUG
-MK_NVCCFLAGS  += -O3
-endif # LLAMA_DEBUG
-else
-MK_CFLAGS     += -O3
-MK_CXXFLAGS   += -O3
-ifndef LLAMA_DEBUG
-MK_NVCCFLAGS  += -O3
-endif # LLAMA_DEBUG
-endif # LLAMA_FAST
-
 ifndef LLAMA_NO_CCACHE
 CCACHE := $(shell which ccache)
 ifdef CCACHE
@@ -228,8 +292,8 @@ ifeq ($(UNAME_S),OpenBSD)
 	MK_CPPFLAGS += -D_BSD_SOURCE
 endif
 
-ifdef LLAMA_SCHED_MAX_COPIES
-	MK_CPPFLAGS += -DGGML_SCHED_MAX_COPIES=$(LLAMA_SCHED_MAX_COPIES)
+ifdef GGML_SCHED_MAX_COPIES
+	MK_CPPFLAGS += -DGGML_SCHED_MAX_COPIES=$(GGML_SCHED_MAX_COPIES)
 endif
 
 ifdef LLAMA_DEBUG
@@ -341,9 +405,6 @@ ifdef LLAMA_GPROF
 	MK_CFLAGS   += -pg
 	MK_CXXFLAGS += -pg
 endif
-ifdef LLAMA_PERF
-	MK_CPPFLAGS += -DGGML_PERF
-endif
 
 # Architecture specific
 # TODO: probably these flags need to be tweaked on some architectures
@@ -434,7 +495,7 @@ else
 	MK_CXXFLAGS += -march=rv64gcv -mabi=lp64d
 endif
 
-ifndef LLAMA_NO_ACCELERATE
+ifndef GGML_NO_ACCELERATE
 	# Mac OS - include Accelerate framework.
 	# `-framework Accelerate` works both with Apple Silicon and Mac Intel
 	ifeq ($(UNAME_S),Darwin)
@@ -444,61 +505,56 @@ ifndef LLAMA_NO_ACCELERATE
 		MK_LDFLAGS  += -framework Accelerate
 		OBJ_GGML    += ggml/src/ggml-blas.o
 	endif
-endif # LLAMA_NO_ACCELERATE
+endif # GGML_NO_ACCELERATE
 
-ifndef LLAMA_NO_OPENMP
+ifndef GGML_NO_OPENMP
 	MK_CPPFLAGS += -DGGML_USE_OPENMP
 	MK_CFLAGS   += -fopenmp
 	MK_CXXFLAGS += -fopenmp
-endif # LLAMA_NO_OPENMP
+endif # GGML_NO_OPENMP
 
-ifdef LLAMA_OPENBLAS
+ifdef GGML_OPENBLAS
 	MK_CPPFLAGS += -DGGML_USE_BLAS $(shell pkg-config --cflags-only-I openblas)
 	MK_CFLAGS   += $(shell pkg-config --cflags-only-other openblas)
 	MK_LDFLAGS  += $(shell pkg-config --libs openblas)
 	OBJ_GGML    += ggml/src/ggml-blas.o
-endif # LLAMA_OPENBLAS
+endif # GGML_OPENBLAS
 
-ifdef LLAMA_OPENBLAS64
+ifdef GGML_OPENBLAS64
 	MK_CPPFLAGS += -DGGML_USE_BLAS $(shell pkg-config --cflags-only-I openblas64)
 	MK_CFLAGS   += $(shell pkg-config --cflags-only-other openblas64)
 	MK_LDFLAGS  += $(shell pkg-config --libs openblas64)
 	OBJ_GGML    += ggml/src/ggml-blas.o
-endif # LLAMA_OPENBLAS64
+endif # GGML_OPENBLAS64
 
-ifdef LLAMA_BLIS
+ifdef GGML_BLIS
 	MK_CPPFLAGS += -DGGML_USE_BLAS -I/usr/local/include/blis -I/usr/include/blis
 	MK_LDFLAGS  += -lblis -L/usr/local/lib
 	OBJ_GGML    += ggml/src/ggml-blas.o
-endif # LLAMA_BLIS
+endif # GGML_BLIS
 
-ifndef LLAMA_NO_LLAMAFILE
+ifndef GGML_NO_LLAMAFILE
 	MK_CPPFLAGS += -DGGML_USE_LLAMAFILE
 	OBJ_GGML    += ggml/src/sgemm.o
 endif
 
-ifdef LLAMA_RPC
+ifdef GGML_RPC
 	MK_CPPFLAGS += -DGGML_USE_RPC
 	OBJ_GGML    += ggml/src/ggml-rpc.o
-endif # LLAMA_RPC
-
-ifdef LLAMA_CUBLAS
-# LLAMA_CUBLAS is deprecated and will be removed in the future
-	LLAMA_CUDA := 1
-endif
+endif # GGML_RPC
 
 OBJ_CUDA_TMPL      = $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/template-instances/fattn-wmma*.cu))
 OBJ_CUDA_TMPL     += $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/template-instances/mmq*.cu))
 
-ifdef LLAMA_CUDA_FA_ALL_QUANTS
+ifdef GGML_CUDA_FA_ALL_QUANTS
 	OBJ_CUDA_TMPL += $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/template-instances/fattn-vec*.cu))
 else
 	OBJ_CUDA_TMPL += $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/template-instances/fattn-vec*q4_0-q4_0.cu))
 	OBJ_CUDA_TMPL += $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/template-instances/fattn-vec*q8_0-q8_0.cu))
 	OBJ_CUDA_TMPL += $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/template-instances/fattn-vec*f16-f16.cu))
-endif # LLAMA_CUDA_FA_ALL_QUANTS
+endif # GGML_CUDA_FA_ALL_QUANTS
 
-ifdef LLAMA_CUDA
+ifdef GGML_CUDA
 	ifneq ('', '$(wildcard /opt/cuda)')
 		CUDA_PATH ?= /opt/cuda
 	else
@@ -525,15 +581,15 @@ ifdef LLAMA_DEBUG
 	MK_NVCCFLAGS += -lineinfo
 endif # LLAMA_DEBUG
 
-ifdef LLAMA_CUDA_DEBUG
+ifdef GGML_CUDA_DEBUG
 	MK_NVCCFLAGS += --device-debug
-endif # LLAMA_CUDA_DEBUG
+endif # GGML_CUDA_DEBUG
 
-ifdef LLAMA_CUDA_NVCC
-	NVCC = $(CCACHE) $(LLAMA_CUDA_NVCC)
+ifdef GGML_CUDA_NVCC
+	NVCC = $(CCACHE) $(GGML_CUDA_NVCC)
 else
 	NVCC = $(CCACHE) nvcc
-endif #LLAMA_CUDA_NVCC
+endif #GGML_CUDA_NVCC
 
 ifdef CUDA_DOCKER_ARCH
 	MK_NVCCFLAGS += -Wno-deprecated-gpu-targets -arch=$(CUDA_DOCKER_ARCH)
@@ -541,59 +597,59 @@ else ifndef CUDA_POWER_ARCH
 	MK_NVCCFLAGS += -arch=native
 endif # CUDA_DOCKER_ARCH
 
-ifdef LLAMA_CUDA_FORCE_DMMV
+ifdef GGML_CUDA_FORCE_DMMV
 	MK_NVCCFLAGS += -DGGML_CUDA_FORCE_DMMV
-endif # LLAMA_CUDA_FORCE_DMMV
+endif # GGML_CUDA_FORCE_DMMV
 
-ifdef LLAMA_CUDA_FORCE_MMQ
+ifdef GGML_CUDA_FORCE_MMQ
 	MK_NVCCFLAGS += -DGGML_CUDA_FORCE_MMQ
-endif # LLAMA_CUDA_FORCE_MMQ
+endif # GGML_CUDA_FORCE_MMQ
 
-ifdef LLAMA_CUDA_DMMV_X
-	MK_NVCCFLAGS += -DGGML_CUDA_DMMV_X=$(LLAMA_CUDA_DMMV_X)
+ifdef GGML_CUDA_DMMV_X
+	MK_NVCCFLAGS += -DGGML_CUDA_DMMV_X=$(GGML_CUDA_DMMV_X)
 else
 	MK_NVCCFLAGS += -DGGML_CUDA_DMMV_X=32
-endif # LLAMA_CUDA_DMMV_X
+endif # GGML_CUDA_DMMV_X
 
-ifdef LLAMA_CUDA_MMV_Y
-	MK_NVCCFLAGS += -DGGML_CUDA_MMV_Y=$(LLAMA_CUDA_MMV_Y)
-else ifdef LLAMA_CUDA_DMMV_Y
-	MK_NVCCFLAGS += -DGGML_CUDA_MMV_Y=$(LLAMA_CUDA_DMMV_Y) # for backwards compatibility
+ifdef GGML_CUDA_MMV_Y
+	MK_NVCCFLAGS += -DGGML_CUDA_MMV_Y=$(GGML_CUDA_MMV_Y)
+else ifdef GGML_CUDA_DMMV_Y
+	MK_NVCCFLAGS += -DGGML_CUDA_MMV_Y=$(GGML_CUDA_DMMV_Y) # for backwards compatibility
 else
 	MK_NVCCFLAGS += -DGGML_CUDA_MMV_Y=1
-endif # LLAMA_CUDA_MMV_Y
+endif # GGML_CUDA_MMV_Y
 
-ifdef LLAMA_CUDA_F16
+ifdef GGML_CUDA_F16
 	MK_NVCCFLAGS += -DGGML_CUDA_F16
-endif # LLAMA_CUDA_F16
+endif # GGML_CUDA_F16
 
-ifdef LLAMA_CUDA_DMMV_F16
+ifdef GGML_CUDA_DMMV_F16
 	MK_NVCCFLAGS += -DGGML_CUDA_F16
-endif # LLAMA_CUDA_DMMV_F16
+endif # GGML_CUDA_DMMV_F16
 
-ifdef LLAMA_CUDA_KQUANTS_ITER
-	MK_NVCCFLAGS += -DK_QUANTS_PER_ITERATION=$(LLAMA_CUDA_KQUANTS_ITER)
+ifdef GGML_CUDA_KQUANTS_ITER
+	MK_NVCCFLAGS += -DK_QUANTS_PER_ITERATION=$(GGML_CUDA_KQUANTS_ITER)
 else
 	MK_NVCCFLAGS += -DK_QUANTS_PER_ITERATION=2
 endif
 
-ifdef LLAMA_CUDA_PEER_MAX_BATCH_SIZE
-	MK_NVCCFLAGS += -DGGML_CUDA_PEER_MAX_BATCH_SIZE=$(LLAMA_CUDA_PEER_MAX_BATCH_SIZE)
+ifdef GGML_CUDA_PEER_MAX_BATCH_SIZE
+	MK_NVCCFLAGS += -DGGML_CUDA_PEER_MAX_BATCH_SIZE=$(GGML_CUDA_PEER_MAX_BATCH_SIZE)
 else
 	MK_NVCCFLAGS += -DGGML_CUDA_PEER_MAX_BATCH_SIZE=128
-endif # LLAMA_CUDA_PEER_MAX_BATCH_SIZE
+endif # GGML_CUDA_PEER_MAX_BATCH_SIZE
 
-ifdef LLAMA_CUDA_NO_PEER_COPY
+ifdef GGML_CUDA_NO_PEER_COPY
 	MK_NVCCFLAGS += -DGGML_CUDA_NO_PEER_COPY
-endif # LLAMA_CUDA_NO_PEER_COPY
+endif # GGML_CUDA_NO_PEER_COPY
 
-ifdef LLAMA_CUDA_CCBIN
-	MK_NVCCFLAGS += -ccbin $(LLAMA_CUDA_CCBIN)
-endif # LLAMA_CUDA_CCBIN
+ifdef GGML_CUDA_CCBIN
+	MK_NVCCFLAGS += -ccbin $(GGML_CUDA_CCBIN)
+endif # GGML_CUDA_CCBIN
 
-ifdef LLAMA_CUDA_FA_ALL_QUANTS
+ifdef GGML_CUDA_FA_ALL_QUANTS
 	MK_NVCCFLAGS += -DGGML_CUDA_FA_ALL_QUANTS
-endif # LLAMA_CUDA_FA_ALL_QUANTS
+endif # GGML_CUDA_FA_ALL_QUANTS
 
 ifdef JETSON_EOL_MODULE_DETECT
 define NVCC_COMPILE
@@ -621,30 +677,30 @@ ggml/src/ggml-cuda.o: \
 	ggml/src/ggml-common.h \
 	$(wildcard ggml/src/ggml-cuda/*.cuh)
 	$(NVCC_COMPILE)
-endif # LLAMA_CUDA
+endif # GGML_CUDA
 
-ifdef LLAMA_VULKAN
+ifdef GGML_VULKAN
 	MK_CPPFLAGS += -DGGML_USE_VULKAN
 	MK_LDFLAGS  += -lvulkan
 	OBJ_GGML    += ggml/src/ggml-vulkan.o
 
-ifdef LLAMA_VULKAN_CHECK_RESULTS
+ifdef GGML_VULKAN_CHECK_RESULTS
 	MK_CPPFLAGS  += -DGGML_VULKAN_CHECK_RESULTS
 endif
 
-ifdef LLAMA_VULKAN_DEBUG
+ifdef GGML_VULKAN_DEBUG
 	MK_CPPFLAGS  += -DGGML_VULKAN_DEBUG
 endif
 
-ifdef LLAMA_VULKAN_MEMORY_DEBUG
+ifdef GGML_VULKAN_MEMORY_DEBUG
 	MK_CPPFLAGS  += -DGGML_VULKAN_MEMORY_DEBUG
 endif
 
-ifdef LLAMA_VULKAN_VALIDATE
+ifdef GGML_VULKAN_VALIDATE
 	MK_CPPFLAGS  += -DGGML_VULKAN_VALIDATE
 endif
 
-ifdef LLAMA_VULKAN_RUN_TESTS
+ifdef GGML_VULKAN_RUN_TESTS
 	MK_CPPFLAGS  += -DGGML_VULKAN_RUN_TESTS
 endif
 
@@ -652,9 +708,9 @@ ggml/src/ggml-vulkan.o: \
 	ggml/src/ggml-vulkan.cpp \
 	ggml/src/ggml-vulkan.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-endif # LLAMA_VULKAN
+endif # GGML_VULKAN
 
-ifdef LLAMA_HIPBLAS
+ifdef GGML_HIPBLAS
 	ifeq ($(wildcard /opt/rocm),)
 		ROCM_PATH      ?= /usr
 		AMDGPU_TARGETS ?= $(shell $(shell which amdgpu-arch))
@@ -663,15 +719,15 @@ ifdef LLAMA_HIPBLAS
 		AMDGPU_TARGETS ?= $(shell $(ROCM_PATH)/llvm/bin/amdgpu-arch)
 	endif
 
-	LLAMA_CUDA_DMMV_X       ?= 32
-	LLAMA_CUDA_MMV_Y        ?= 1
-	LLAMA_CUDA_KQUANTS_ITER ?= 2
+	GGML_CUDA_DMMV_X       ?= 32
+	GGML_CUDA_MMV_Y        ?= 1
+	GGML_CUDA_KQUANTS_ITER ?= 2
 
 	MK_CPPFLAGS += -DGGML_USE_HIPBLAS -DGGML_USE_CUDA
 
-ifdef LLAMA_HIP_UMA
+ifdef GGML_HIP_UMA
 	MK_CPPFLAGS += -DGGML_HIP_UMA
-endif # LLAMA_HIP_UMA
+endif # GGML_HIP_UMA
 
 	MK_LDFLAGS += -L$(ROCM_PATH)/lib -Wl,-rpath=$(ROCM_PATH)/lib
 	MK_LDFLAGS += -L$(ROCM_PATH)/lib64 -Wl,-rpath=$(ROCM_PATH)/lib64
@@ -680,17 +736,17 @@ endif # LLAMA_HIP_UMA
 	HIPCC ?= $(CCACHE) $(ROCM_PATH)/bin/hipcc
 
 	HIPFLAGS += $(addprefix --offload-arch=,$(AMDGPU_TARGETS))
-	HIPFLAGS += -DGGML_CUDA_DMMV_X=$(LLAMA_CUDA_DMMV_X)
-	HIPFLAGS += -DGGML_CUDA_MMV_Y=$(LLAMA_CUDA_MMV_Y)
-	HIPFLAGS += -DK_QUANTS_PER_ITERATION=$(LLAMA_CUDA_KQUANTS_ITER)
+	HIPFLAGS += -DGGML_CUDA_DMMV_X=$(GGML_CUDA_DMMV_X)
+	HIPFLAGS += -DGGML_CUDA_MMV_Y=$(GGML_CUDA_MMV_Y)
+	HIPFLAGS += -DK_QUANTS_PER_ITERATION=$(GGML_CUDA_KQUANTS_ITER)
 
-ifdef LLAMA_CUDA_FORCE_DMMV
+ifdef GGML_CUDA_FORCE_DMMV
 	HIPFLAGS += -DGGML_CUDA_FORCE_DMMV
-endif # LLAMA_CUDA_FORCE_DMMV
+endif # GGML_CUDA_FORCE_DMMV
 
-ifdef LLAMA_CUDA_NO_PEER_COPY
+ifdef GGML_CUDA_NO_PEER_COPY
 	HIPFLAGS += -DGGML_CUDA_NO_PEER_COPY
-endif # LLAMA_CUDA_NO_PEER_COPY
+endif # GGML_CUDA_NO_PEER_COPY
 
 	OBJ_GGML += ggml/src/ggml-cuda.o
 	OBJ_GGML += $(patsubst %.cu,%.o,$(wildcard ggml/src/ggml-cuda/*.cu))
@@ -712,29 +768,29 @@ ggml/src/ggml-cuda/%.o: \
 	ggml/src/ggml-common.h \
 	ggml/src/ggml-cuda/common.cuh
 	$(HIPCC) $(CXXFLAGS) $(HIPFLAGS) -x hip -c -o $@ $<
-endif # LLAMA_HIPBLAS
+endif # GGML_HIPBLAS
 
-ifdef LLAMA_METAL
+ifdef GGML_METAL
 	MK_CPPFLAGS += -DGGML_USE_METAL
 	MK_LDFLAGS  += -framework Foundation -framework Metal -framework MetalKit
 	OBJ_GGML	+= ggml/src/ggml-metal.o
-ifdef LLAMA_METAL_NDEBUG
+ifdef GGML_METAL_NDEBUG
 	MK_CPPFLAGS += -DGGML_METAL_NDEBUG
 endif
-ifdef LLAMA_METAL_EMBED_LIBRARY
+ifdef GGML_METAL_EMBED_LIBRARY
 	MK_CPPFLAGS += -DGGML_METAL_EMBED_LIBRARY
 	OBJ_GGML   += ggml/src/ggml-metal-embed.o
 endif
-endif # LLAMA_METAL
+endif # GGML_METAL
 
-ifdef LLAMA_METAL
+ifdef GGML_METAL
 ggml/src/ggml-metal.o: \
 	ggml/src/ggml-metal.m \
 	ggml/src/ggml-metal.h \
 	ggml/include/ggml.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-ifdef LLAMA_METAL_EMBED_LIBRARY
+ifdef GGML_METAL_EMBED_LIBRARY
 ggml/src/ggml-metal-embed.o: \
 	ggml/src/ggml-metal.metal \
 	ggml/src/ggml-common.h
@@ -750,7 +806,7 @@ ggml/src/ggml-metal-embed.o: \
 	@$(AS) $(TEMP_ASSEMBLY) -o $@
 	@rm -f ${TEMP_ASSEMBLY}
 endif
-endif # LLAMA_METAL
+endif # GGML_METAL
 
 OBJ_GGML += \
 	ggml/src/ggml.o \
@@ -828,19 +884,34 @@ ifdef LLAMA_CUDA
 $(info I NVCC:      $(shell $(NVCC) --version | tail -n 1))
 CUDA_VERSION := $(shell $(NVCC) --version | grep -oP 'release (\K[0-9]+\.[0-9])')
 ifeq ($(shell awk -v "v=$(CUDA_VERSION)" 'BEGIN { print (v < 11.7) }'),1)
+
 ifndef CUDA_DOCKER_ARCH
 ifndef CUDA_POWER_ARCH
 $(error I ERROR: For CUDA versions < 11.7 a target CUDA architecture must be explicitly provided via environment variable CUDA_DOCKER_ARCH, e.g. by running "export CUDA_DOCKER_ARCH=compute_XX" on Unix-like systems, where XX is the minimum compute capability that the code needs to run on. A list with compute capabilities can be found here: https://developer.nvidia.com/cuda-gpus )
 endif # CUDA_POWER_ARCH
 endif # CUDA_DOCKER_ARCH
+
 endif # eq ($(shell echo "$(CUDA_VERSION) < 11.7" | bc),1)
 endif # LLAMA_CUDA
 $(info )
 
-ifdef LLAMA_CUBLAS
-$(info !!!!)
-$(info LLAMA_CUBLAS is deprecated and will be removed in the future. Use LLAMA_CUDA instead.)
-$(info !!!!)
+ifdef DEPRECATE_WARNING
+$(info !!! DEPRECATION WARNING !!!)
+$(info The following LLAMA_ options are deprecated and will be removed in the future. Use the GGML_ prefix instead)
+$(info   - LLAMA_CUDA)
+$(info   - LLAMA_METAL)
+$(info   - LLAMA_METAL_EMBED_LIBRARY)
+$(info   - LLAMA_OPENMP)
+$(info   - LLAMA_RPC)
+$(info   - LLAMA_SYCL)
+$(info   - LLAMA_SYCL_F16)
+$(info   - LLAMA_OPENBLAS)
+$(info   - LLAMA_OPENBLAS64)
+$(info   - LLAMA_BLIS)
+$(info   - LLAMA_NO_LLAMAFILE)
+$(info   - LLAMA_NO_ACCELERATE)
+$(info   - LLAMA_NO_OPENMP)
+$(info   - LLAMA_NO_METAL)
 $(info )
 endif
 
@@ -879,20 +950,20 @@ ggml/src/ggml-blas.o: \
 	ggml/src/ggml-blas.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-ifndef LLAMA_NO_LLAMAFILE
+ifndef GGML_NO_LLAMAFILE
 ggml/src/sgemm.o: \
 	ggml/src/sgemm.cpp \
 	ggml/src/sgemm.h \
 	ggml/include/ggml.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-endif # LLAMA_NO_LLAMAFILE
+endif # GGML_NO_LLAMAFILE
 
-ifdef LLAMA_RPC
+ifdef GGML_RPC
 ggml/src/ggml-rpc.o: \
 	ggml/src/ggml-rpc.cpp \
 	ggml/src/ggml-rpc.h
 	$(CXX) $(CXXFLAGS) -c $< -o $@
-endif # LLAMA_RPC
+endif # GGML_RPC
 
 $(LIB_GGML): \
 	$(OBJ_GGML)
@@ -1187,11 +1258,11 @@ llama-gbnf-validator: examples/gbnf-validator/gbnf-validator.cpp \
 	$(CXX) $(CXXFLAGS) -c $< -o $(call GET_OBJ_FILE, $<)
 	$(CXX) $(CXXFLAGS) $(filter-out %.h $<,$^) $(call GET_OBJ_FILE, $<) -o $@ $(LDFLAGS)
 
-ifdef LLAMA_RPC
+ifdef GGML_RPC
 rpc-server: examples/rpc/rpc-server.cpp \
 	$(OBJ_GGML)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
-endif # LLAMA_RPC
+endif # GGML_RPC
 
 llama-server: \
 	examples/server/server.cpp \
